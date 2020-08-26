@@ -1,0 +1,87 @@
+(use "error.witx")
+(use "cookie.witx")
+
+(typename $response_handle (handle))
+
+(module $response
+  ;;; Creates a new HTTP response.
+  (@interface func (export "new")
+    (param $status u16)
+    (result $error $error)
+    (result $response $response_handle)
+  )
+
+  ;;; Frees the response.
+  (@interface func (export "free")
+    (param $response $response_handle)
+    (result $error $error)
+  )
+
+  ;;; Gets the response status.
+  (@interface func (export "status_get")
+    (param $response $response_handle)
+    (result $error $error)
+    (result $status u16)
+  )
+
+  ;;; Gets the length of a response header.
+  (@interface func (export "header_length")
+    (param $response $response_handle)
+    (param $name string)
+    (result $error $error)
+    (result $length (@witx usize))
+  )
+
+  ;;; Gets a response header.
+  (@interface func (export "header_get")
+    (param $response $response_handle)
+    (param $name string)
+    (param $buffer (@witx pointer char8))
+    (param $buffer_len (@witx usize))
+    (result $error $error)
+  )
+
+  ;;; Sets a response header.
+  (@interface func (export "header_set")
+    (param $response $response_handle)
+    (param $name string)
+    (param $value string)
+    (result $error $error)
+  )
+
+  ;;; Inserts a response cookie.
+  (@interface func (export "cookie_insert")
+    (param $response $response_handle)
+    (param $cookie $cookie_handle)
+    (result $error $error)
+  )
+
+  ;;; Removes a response cookie.
+  (@interface func (export "cookie_remove")
+    (param $response $response_handle)
+    (param $cookie $cookie_handle)
+    (result $error $error)
+  )
+
+  ;;; Gets the length of the response body.
+  (@interface func (export "body_length")
+    (param $response $response_handle)
+    (result $error $error)
+    (result $length (@witx usize))
+  )
+
+  ;;; Gets the response body.
+  (@interface func (export "body_get")
+    (param $response $response_handle)
+    (param $buffer (@witx pointer char8))
+    (param $buffer_len (@witx usize))
+    (result $error $error)
+  )
+
+  ;;; Sets the response body.
+  (@interface func (export "body_set")
+    (param $response $response_handle)
+    (param $body (array u8))
+    (result $error $error)
+  )
+)

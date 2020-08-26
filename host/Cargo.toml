@@ -1,0 +1,17 @@
+[package]
+name = "wasmtime-functions-host"
+version = "0.1.0"
+authors = ["Peter Huene <peter@huene.dev>"]
+edition = "2018"
+default-run = "wasmtime-functions-host"
+
+[dependencies]
+wasmtime-functions-runtime = { path = "../crates/runtime" }
+structopt = { version = "0.3.17", features = ["color", "suggestions"] }
+anyhow = "1.0.32"
+futures = "0.3.5"
+async-std = { version = "1.6.3", features = ["attributes"] }
+async-ctrlc = "1.2.0"
+log = "0.4.11"
+env_logger = "0.7.1"
+rpassword = "5.0.0"

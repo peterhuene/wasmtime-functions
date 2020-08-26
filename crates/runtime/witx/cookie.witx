@@ -1,0 +1,70 @@
+(use "error.witx")
+
+(typename $cookie_handle (handle))
+
+(typename $same_site_policy
+  (enum u8
+    ;;; Strict policy
+    $strict
+    ;;; Lax policy
+    $lax
+    ;;; No policy
+    $none
+  )
+)
+
+(module $cookie
+  ;;; Creates a new response cookie.
+  (@interface func (export "new")
+    (param $name string)
+    (param $value string)
+    (result $error $error)
+    (result $cookie $cookie_handle)
+  )
+
+  ;;; Frees the response cookie.
+  (@interface func (export "free")
+    (param $cookie $cookie_handle)
+    (result $error $error)
+  )
+
+  ;;; Sets the HttpOnly attribute on the cookie.
+  (@interface func (export "http_only_set")
+    (param $cookie $cookie_handle)
+    (result $error $error)
+  )
+
+  ;;; Sets the Secure attribute on the cookie.
+  (@interface func (export "secure_set")
+    (param $cookie $cookie_handle)
+    (result $error $error)
+  )
+
+  ;;; Sets the MaxAge attribute on the cookie.
+  (@interface func (export "max_age_set")
+    (param $cookie $cookie_handle)
+    (param $max_age s64)
+    (result $error $error)
+  )
+
+  ;;; Sets the SameSite attribute on the cookie.
+  (@interface func (export "same_site_set")
+    (param $cookie $cookie_handle)
+    (param $same_site $same_site_policy)
+    (result $error $error)
+  )
+
+  ;;; Sets the Domain attribute on the cookie.
+  (@interface func (export "domain_set")
+    (param $cookie $cookie_handle)
+    (param $domain string)
+    (result $error $error)
+  )
+
+  ;;; Sets the Path attribute on the cookie.
+  (@interface func (export "path_set")
+    (param $cookie $cookie_handle)
+    (param $path string)
+    (result $error $error)
+  )
+)
