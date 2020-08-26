@@ -1,0 +1,22 @@
+(typename $error
+  (enum u32
+    ;;; Success
+    $ok
+    ;;; The module does not export a memory.
+    $missing_memory
+    ;;; Invalid argument
+    $invalid_argument
+    ;;; Invalid UTF-8
+    $invalid_utf8
+    ;;; Invalid pointer
+    $invalid_pointer
+    ;;; Invalid buffer length
+    $invalid_length
+    ;;; Invalid handle
+    $invalid_handle
+    ;;; Integer overflow
+    $integer_overflow
+    ;;; Handle space exhausted
+    $handles_exhausted
+  )
+)

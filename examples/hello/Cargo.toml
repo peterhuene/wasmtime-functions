@@ -1,0 +1,8 @@
+[package]
+name = "hello-example"
+version = "0.1.0"
+authors = ["Peter Huene <peter@huene.dev>"]
+edition = "2018"
+
+[dependencies]
+wasmtime-functions = { path = "../../crates/wasmtime-functions" }
