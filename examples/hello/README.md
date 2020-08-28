@@ -2,9 +2,19 @@
 
 This is a [simple serverless application](src/main.rs) that exposes a single HTTP function that responds with a greeting message.
 
+## Install `cargo wasi`
+
+[`cargo wasi`](https://github.com/bytecodealliance/cargo-wasi) is a fantastic tool for easily building Rust crates as WebAssembly modules.
+
+Use `cargo` to install:
+
+```text
+$ cargo install cargo-wasi
+```
+
 ## Running the example
 
-Start with building the example application:
+Start with building the example application with `cargo wasi`:
 
 ```text
 $ cargo wasi build --release -p hello-example
