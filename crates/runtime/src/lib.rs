@@ -5,6 +5,7 @@
 #![deny(missing_docs)]
 
 mod host;
+mod log;
 mod server;
 
 pub use server::{EnvironmentProvider, Server};

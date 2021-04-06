@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use async_ctrlc::CtrlC;
+use async_std::prelude::FutureExt;
 use env_logger::builder;
 use rpassword::read_password_from_tty;
 use std::net::SocketAddr;
@@ -64,17 +65,19 @@ async fn run(options: Options) -> Result<()> {
 
     let environment = EnvironmentProvider(options.environment);
 
-    let server = Server::new(addr, &module, &environment, options.debug_info, true).await?;
+    let mut server = Server::new(addr, &module, &environment, options.debug_info, true).await?;
 
-    log::info!(
-        "application listening at http://{}:{}",
-        addr.ip(),
-        server.port()
-    );
+    log::info!("Application listening at {}", server);
 
-    CtrlC::new().unwrap().await;
+    let ctrlc = CtrlC::new()?;
 
-    log::info!("shutting down...");
+    ctrlc
+        .race(async move {
+            server.accept().await.unwrap();
+        })
+        .await;
+
+    log::info!("Shutting down...");
 
     Ok(())
 }
@@ -82,12 +85,13 @@ async fn run(options: Options) -> Result<()> {
 #[async_std::main]
 async fn main() {
     builder()
+        .format_module_path(false)
         .filter_module("wasmtime_functions_runtime", log::LevelFilter::Info)
         .filter_module("wasmtime_functions_host", log::LevelFilter::Info)
         .init();
 
     if let Err(e) = run(Options::from_args()).await {
-        log::error!("error: {}", e);
+        log::error!("{:?}", e);
         std::process::exit(1);
     }
 }

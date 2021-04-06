@@ -7,8 +7,9 @@ use tide::StatusCode;
 use wiggle::{GuestError, GuestErrorType, GuestPtr};
 
 wiggle::from_witx!({
-    witx: ["witx/request.witx", "witx/response.witx", "witx/cookie.witx"],
-    ctx: HostContext,
+    witx: [
+        "crates/runtime/witx/functions.witx",
+    ],
 });
 
 // In the future, we should use an externref for handles
@@ -56,7 +57,7 @@ impl HostContextInner {
         &mut self,
         handle: types::ResponseHandle,
     ) -> Result<(tide::Response, Vec<u8>), types::Error> {
-        if self.get_response(handle.clone()).is_none() {
+        if self.get_response(handle).is_none() {
             return Err(types::Error::InvalidHandle);
         }
 
@@ -70,7 +71,7 @@ impl HostContextInner {
         &mut self,
         handle: types::CookieHandle,
     ) -> Result<http_types::Cookie<'static>, types::Error> {
-        if self.get_cookie_mut(handle.clone()).is_none() {
+        if self.get_cookie_mut(handle).is_none() {
             return Err(types::Error::InvalidHandle);
         }
 
@@ -148,12 +149,16 @@ impl HostContext {
     }
 }
 
-impl request::Request for HostContext {
-    fn method_length(&self) -> Result<u32, types::Error> {
+impl functions::Functions for HostContext {
+    fn request_method_length(&self) -> Result<u32, types::Error> {
         Ok(self.inner().request.0.method().as_ref().len() as u32)
     }
 
-    fn method_get(&self, buffer: &GuestPtr<u8>, buffer_len: u32) -> Result<(), types::Error> {
+    fn request_method_get(
+        &self,
+        buffer: &GuestPtr<u8>,
+        buffer_len: u32,
+    ) -> Result<(), types::Error> {
         buffer
             .as_array(buffer_len)
             .copy_from_slice(self.inner().request.0.method().as_ref().as_bytes())?;
@@ -161,11 +166,11 @@ impl request::Request for HostContext {
         Ok(())
     }
 
-    fn uri_length(&self) -> Result<u32, types::Error> {
+    fn request_uri_length(&self) -> Result<u32, types::Error> {
         Ok(self.inner().request.0.url().as_str().len() as u32)
     }
 
-    fn uri_get(&self, buffer: &GuestPtr<u8>, buffer_len: u32) -> Result<(), types::Error> {
+    fn request_uri_get(&self, buffer: &GuestPtr<u8>, buffer_len: u32) -> Result<(), types::Error> {
         buffer
             .as_array(buffer_len)
             .copy_from_slice(self.inner().request.0.url().as_str().as_bytes())?;
@@ -173,14 +178,14 @@ impl request::Request for HostContext {
         Ok(())
     }
 
-    fn header_length(&self, name: &GuestPtr<str>) -> Result<u32, types::Error> {
+    fn request_header_length(&self, name: &GuestPtr<str>) -> Result<u32, types::Error> {
         Ok(match self.inner().request.0.header(&*name.as_str()?) {
             Some(v) => v.as_str().len() as u32,
             None => 0,
         })
     }
 
-    fn header_get(
+    fn request_header_get(
         &self,
         name: &GuestPtr<str>,
         buffer: &GuestPtr<u8>,
@@ -195,14 +200,14 @@ impl request::Request for HostContext {
         Ok(())
     }
 
-    fn cookie_length(&self, name: &GuestPtr<str>) -> Result<u32, types::Error> {
+    fn request_cookie_length(&self, name: &GuestPtr<str>) -> Result<u32, types::Error> {
         Ok(match self.inner().request.0.cookie(&*name.as_str()?) {
             Some(c) => c.value().len() as u32,
             None => 0,
         })
     }
 
-    fn cookie_get(
+    fn request_cookie_get(
         &self,
         name: &GuestPtr<str>,
         buffer: &GuestPtr<u8>,
@@ -217,58 +222,47 @@ impl request::Request for HostContext {
         Ok(())
     }
 
-    fn param_length(&self, name: &GuestPtr<str>) -> Result<u32, types::Error> {
-        Ok(
-            match self
-                .inner()
-                .request
-                .0
-                .param::<String>(&*name.as_str()?)
-                .ok()
-            {
-                Some(p) => p.len() as u32,
-                None => 0,
-            },
-        )
+    fn request_param_length(&self, name: &GuestPtr<str>) -> Result<u32, types::Error> {
+        Ok(match self.inner().request.0.param(&*name.as_str()?).ok() {
+            Some(p) => p.len() as u32,
+            None => 0,
+        })
     }
 
-    fn param_get(
+    fn request_param_get(
         &self,
         name: &GuestPtr<str>,
         buffer: &GuestPtr<u8>,
         buffer_len: u32,
     ) -> Result<(), types::Error> {
-        if let Ok(p) = self.inner().request.0.param::<String>(&*name.as_str()?) {
+        if let Ok(p) = self.inner().request.0.param(&*name.as_str()?) {
             buffer.as_array(buffer_len).copy_from_slice(p.as_bytes())?;
         }
 
         Ok(())
     }
 
-    fn body_length(&self) -> Result<u32, types::Error> {
+    fn request_body_length(&self) -> Result<u32, types::Error> {
         Ok(self.inner().request.1.len() as u32)
     }
 
-    fn body_get(&self, buffer: &GuestPtr<u8>, buffer_len: u32) -> Result<(), types::Error> {
+    fn request_body_get(&self, buffer: &GuestPtr<u8>, buffer_len: u32) -> Result<(), types::Error> {
         buffer
             .as_array(buffer_len)
             .copy_from_slice(&self.inner().request.1)?;
 
         Ok(())
     }
-}
 
-impl response::Response for HostContext {
-    #[allow(clippy::new_ret_no_self)]
-    fn new(&self, status: u16) -> Result<types::ResponseHandle, types::Error> {
+    fn response_new(&self, status: u16) -> Result<types::ResponseHandle, types::Error> {
         self.inner_mut().insert_response(status)
     }
 
-    fn free(&self, response: types::ResponseHandle) -> Result<(), types::Error> {
+    fn response_free(&self, response: types::ResponseHandle) -> Result<(), types::Error> {
         self.inner_mut().remove_response(response).map(|_| ())
     }
 
-    fn status_get(&self, response: types::ResponseHandle) -> Result<u16, types::Error> {
+    fn response_status_get(&self, response: types::ResponseHandle) -> Result<u16, types::Error> {
         Ok(u16::from(
             self.inner()
                 .get_response(response)
@@ -278,7 +272,7 @@ impl response::Response for HostContext {
         ))
     }
 
-    fn header_length(
+    fn response_header_length(
         &self,
         response: types::ResponseHandle,
         name: &GuestPtr<str>,
@@ -297,7 +291,7 @@ impl response::Response for HostContext {
         )
     }
 
-    fn header_get(
+    fn response_header_get(
         &self,
         response: types::ResponseHandle,
         name: &GuestPtr<str>,
@@ -319,7 +313,7 @@ impl response::Response for HostContext {
         Ok(())
     }
 
-    fn header_set(
+    fn response_header_set(
         &self,
         response: types::ResponseHandle,
         name: &GuestPtr<str>,
@@ -334,7 +328,7 @@ impl response::Response for HostContext {
         Ok(())
     }
 
-    fn cookie_insert(
+    fn response_cookie_insert(
         &self,
         response: types::ResponseHandle,
         cookie: types::CookieHandle,
@@ -350,7 +344,7 @@ impl response::Response for HostContext {
         Ok(())
     }
 
-    fn cookie_remove(
+    fn response_cookie_remove(
         &self,
         response: types::ResponseHandle,
         cookie: types::CookieHandle,
@@ -366,7 +360,7 @@ impl response::Response for HostContext {
         Ok(())
     }
 
-    fn body_length(&self, response: types::ResponseHandle) -> Result<u32, types::Error> {
+    fn response_body_length(&self, response: types::ResponseHandle) -> Result<u32, types::Error> {
         Ok(self
             .inner()
             .get_response(response)
@@ -375,7 +369,7 @@ impl response::Response for HostContext {
             .len() as u32)
     }
 
-    fn body_get(
+    fn response_body_get(
         &self,
         response: types::ResponseHandle,
         buffer: &GuestPtr<u8>,
@@ -392,7 +386,7 @@ impl response::Response for HostContext {
         Ok(())
     }
 
-    fn body_set(
+    fn response_body_set(
         &self,
         response: types::ResponseHandle,
         bytes: &GuestPtr<[u8]>,
@@ -409,11 +403,8 @@ impl response::Response for HostContext {
 
         Ok(())
     }
-}
 
-impl cookie::Cookie for HostContext {
-    #[allow(clippy::new_ret_no_self)]
-    fn new(
+    fn cookie_new(
         &self,
         name: &GuestPtr<str>,
         value: &GuestPtr<str>,
@@ -422,11 +413,11 @@ impl cookie::Cookie for HostContext {
             .insert_cookie(&name.as_str()?, &value.as_str()?)
     }
 
-    fn free(&self, cookie: types::CookieHandle) -> Result<(), types::Error> {
+    fn cookie_free(&self, cookie: types::CookieHandle) -> Result<(), types::Error> {
         self.inner_mut().remove_cookie(cookie).map(|_| ())
     }
 
-    fn http_only_set(&self, cookie: types::CookieHandle) -> Result<(), types::Error> {
+    fn cookie_http_only_set(&self, cookie: types::CookieHandle) -> Result<(), types::Error> {
         self.inner_mut()
             .get_cookie_mut(cookie)
             .ok_or(types::Error::InvalidHandle)?
@@ -435,7 +426,7 @@ impl cookie::Cookie for HostContext {
         Ok(())
     }
 
-    fn secure_set(&self, cookie: types::CookieHandle) -> Result<(), types::Error> {
+    fn cookie_secure_set(&self, cookie: types::CookieHandle) -> Result<(), types::Error> {
         self.inner_mut()
             .get_cookie_mut(cookie)
             .ok_or(types::Error::InvalidHandle)?
@@ -444,7 +435,11 @@ impl cookie::Cookie for HostContext {
         Ok(())
     }
 
-    fn max_age_set(&self, cookie: types::CookieHandle, max_age: i64) -> Result<(), types::Error> {
+    fn cookie_max_age_set(
+        &self,
+        cookie: types::CookieHandle,
+        max_age: i64,
+    ) -> Result<(), types::Error> {
         self.inner_mut()
             .get_cookie_mut(cookie)
             .ok_or(types::Error::InvalidHandle)?
@@ -453,7 +448,7 @@ impl cookie::Cookie for HostContext {
         Ok(())
     }
 
-    fn same_site_set(
+    fn cookie_same_site_set(
         &self,
         cookie: types::CookieHandle,
         same_site: types::SameSitePolicy,
@@ -472,7 +467,7 @@ impl cookie::Cookie for HostContext {
         Ok(())
     }
 
-    fn domain_set(
+    fn cookie_domain_set(
         &self,
         cookie: types::CookieHandle,
         domain: &GuestPtr<str>,
@@ -485,7 +480,7 @@ impl cookie::Cookie for HostContext {
         Ok(())
     }
 
-    fn path_set(
+    fn cookie_path_set(
         &self,
         cookie: types::CookieHandle,
         path: &GuestPtr<str>,
@@ -496,6 +491,12 @@ impl cookie::Cookie for HostContext {
             .set_path(path.as_str()?.to_string());
 
         Ok(())
+    }
+}
+
+impl GuestErrorType for types::Error {
+    fn success() -> Self {
+        Self::Ok
     }
 }
 
@@ -511,42 +512,22 @@ impl From<GuestError> for types::Error {
             GuestError::InvalidUtf8 { .. } => Self::InvalidUtf8,
             GuestError::TryFromIntError { .. } => Self::IntegerOverflow,
             GuestError::InFunc { err, .. } => (*err).into(),
-            GuestError::InDataField { err, .. } => (*err).into(),
             GuestError::SliceLengthsDiffer { .. } => Self::InvalidLength,
             GuestError::BorrowCheckerOutOfHandles { .. } => Self::InvalidPointer,
         }
     }
 }
 
-impl types::GuestErrorConversion for HostContext {
-    fn into_error(&self, e: GuestError) -> types::Error {
-        e.into()
-    }
-}
-
-impl GuestErrorType for types::Error {
-    fn success() -> Self {
-        types::Error::Ok
-    }
-}
-
 wasmtime_wiggle::wasmtime_integration!({
     target: self,
-    witx: ["witx/request.witx", "witx/response.witx", "witx/cookie.witx"],
+    witx: [
+        "crates/runtime/witx/functions.witx",
+    ],
     ctx: HostContext,
     modules: {
-        request => {
-            name: RequestFunctions,
-            docs: "Represents the linkable host functions for the `request` module.",
-        },
-        response => {
-            name: ResponseFunctions,
-            docs: "Represents the linkable host functions for the `response` module.",
-        },
-        cookie => {
-            name: CookieFunctions,
-            docs: "Represents the linkable host functions for the `cookie` module.",
+        functions => {
+            name: Functions,
+            docs: "Represents the linkable host functions for the `functions` module.",
         },
     },
-    missing_memory: { crate::host::types::Error::MissingMemory },
 });

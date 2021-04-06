@@ -24,8 +24,6 @@
 
 extern crate proc_macro;
 
-mod import;
-
 use proc_macro::{Span, TokenStream};
 use quote::quote;
 use serde::Serialize;
@@ -420,13 +418,4 @@ pub fn var(item: TokenStream) -> TokenStream {
         serde_json::to_string(&vars.vec).unwrap().as_bytes(),
     )
     .into()
-}
-
-/// A macro for generating imports from interfaces in witx files.
-#[proc_macro]
-pub fn import(item: TokenStream) -> TokenStream {
-    match import::generate(parse_macro_input!(item as import::Input)) {
-        Ok(s) => s,
-        Err(e) => e.to_compile_error().into(),
-    }
 }

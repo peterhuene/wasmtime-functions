@@ -33,6 +33,6 @@ The host will be listening for connections at port 3000.
 Lastly, execute the `hello` function:
 
 ```
-$ curl -v localhost:3000/world && echo
+$ curl -v localhost:3000/hello/world && echo
 Hello, world!
 ```

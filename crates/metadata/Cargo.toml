@@ -5,7 +5,7 @@ authors = ["Peter Huene <peter@huene.dev>"]
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.32"
-serde = { version = "1.0.115", features = ["derive"] }
-serde_json = "1.0.57"
-wasmparser = "0.62.0"
+anyhow = "1.0.40"
+serde = { version = "1.0.125", features = ["derive"] }
+serde_json = "1.0.64"
+wasmparser = "0.77.0"

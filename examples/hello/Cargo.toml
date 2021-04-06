@@ -5,4 +5,4 @@ authors = ["Peter Huene <peter@huene.dev>"]
 edition = "2018"
 
 [dependencies]
-wasmtime-functions = { path = "../../crates/wasmtime-functions" }
+wasmtime-functions = { path = "../../crates/functions" }
