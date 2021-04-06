@@ -25,7 +25,7 @@ This will create a `hello-example.wasm` file in `target/wasm32-wasi/release`.
 Next, start the Wasmtime Functions host:
 
 ```
-$ cargo run -- target/wasm32-wasi/release/hello-example.wasm --addr 127.0.0.1:3000
+$ cargo run --release -- target/wasm32-wasi/release/hello-example.wasm --addr 127.0.0.1:3000
 ```
 
 The host will be listening for connections at port 3000.
