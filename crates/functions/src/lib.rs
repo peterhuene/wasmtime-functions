@@ -4,7 +4,7 @@
 
 #![deny(missing_docs)]
 
-mod imports;
+witx_bindgen_rust::import!("crates/runtime/witx/functions.witx");
 
 use http::Uri;
 use std::fmt;
@@ -15,122 +15,71 @@ pub type StatusCode = http::StatusCode;
 
 /// Represents a HTTP request.
 #[derive(Debug)]
-pub struct Request;
+pub struct Request(functions::Request);
 
 impl Request {
+    #[doc(hidden)]
+    pub unsafe fn from_raw(handle: u32) -> Self {
+        Self(functions::Request::from_raw(handle as i32))
+    }
+
     /// Gets the URI of the HTTP request.
     pub fn uri(&self) -> Uri {
-        unsafe {
-            let len = imports::request_uri_length().unwrap();
-            let mut buf = Vec::with_capacity(len);
-            imports::request_uri_get(buf.as_mut_ptr(), len).unwrap();
-            buf.set_len(len);
-            std::str::from_utf8_unchecked(&buf)
-                .parse()
-                .expect("URI is invalid")
-        }
+        functions::request_uri(&self.0)
+            .parse()
+            .expect("URI is invalid")
     }
 
     /// Gets the method of the HTTP request.
     pub fn method(&self) -> String {
-        unsafe {
-            let len = imports::request_method_length().unwrap();
-            if len == 0 {
-                return String::new();
-            }
-            let mut buf = Vec::with_capacity(len);
-            imports::request_method_get(buf.as_mut_ptr(), len).unwrap();
-            buf.set_len(len);
-            String::from_utf8_unchecked(buf)
-        }
+        functions::request_method(&self.0)
     }
 
     /// Gets a header of the HTTP request.
     pub fn header<T: AsRef<str>>(&self, name: T) -> Option<String> {
-        unsafe {
-            let len = imports::request_header_length(name.as_ref()).unwrap();
-            if len == 0 {
-                return None;
-            }
-            let mut buf = Vec::with_capacity(len);
-            imports::request_header_get(name.as_ref(), buf.as_mut_ptr(), len).unwrap();
-            buf.set_len(len);
-            Some(String::from_utf8_unchecked(buf))
-        }
+        functions::request_header(&self.0, name.as_ref())
     }
 
     /// Gets a cookie of the HTTP request.
     pub fn cookie<T: AsRef<str>>(&self, name: T) -> Option<String> {
-        unsafe {
-            let len = imports::request_cookie_length(name.as_ref()).unwrap();
-            if len == 0 {
-                return None;
-            }
-            let mut buf = Vec::with_capacity(len);
-            imports::request_cookie_get(name.as_ref(), buf.as_mut_ptr(), len).unwrap();
-            buf.set_len(len);
-            Some(String::from_utf8_unchecked(buf))
-        }
+        functions::request_cookie(&self.0, name.as_ref())
     }
 
     /// Gets a parameter of the HTTP request.
     pub fn param<T: AsRef<str>>(&self, name: T) -> Option<String> {
-        unsafe {
-            let len = imports::request_param_length(name.as_ref()).unwrap();
-            if len == 0 {
-                return None;
-            }
-            let mut buf = Vec::with_capacity(len);
-            imports::request_param_get(name.as_ref(), buf.as_mut_ptr(), len).unwrap();
-            buf.set_len(len);
-            Some(String::from_utf8_unchecked(buf))
-        }
+        functions::request_param(&self.0, name.as_ref())
     }
 
     /// Gets the body of the HTTP request.
     pub fn body(&self) -> Vec<u8> {
-        unsafe {
-            let len = imports::request_body_length().unwrap();
-            let mut buf = Vec::with_capacity(len);
-            imports::request_body_get(buf.as_mut_ptr(), len).unwrap();
-            buf.set_len(len);
-            buf
-        }
+        functions::request_body(&self.0)
     }
 }
 
 /// Used for building HTTP responses.
-pub struct ResponseBuilder(Response);
+pub struct ResponseBuilder(functions::Response);
 
 impl ResponseBuilder {
     /// Creates a new HTTP response builder.
     pub fn new(status: StatusCode) -> Self {
-        Self(
-            unsafe { imports::response_new(status.as_u16()) }
-                .map(Response)
-                .unwrap(),
-        )
+        Self(functions::response_new(status.as_u16()).expect("status code is invalid"))
     }
 
     /// Sets a header of the HTTP response.
     pub fn header<T: AsRef<str>, U: AsRef<str>>(self, name: T, value: U) -> Self {
-        unsafe { imports::response_header_set((self.0).0, name.as_ref(), value.as_ref()) }.unwrap();
+        functions::response_set_header(&self.0, name.as_ref(), value.as_ref());
         self
     }
 
-    /// Inserts a cookie into the HTTP response.
-    pub fn insert_cookie(self, cookie: Cookie) -> Self {
-        let handle = cookie.0;
-        std::mem::forget(cookie);
-        unsafe { imports::response_cookie_insert((self.0).0, handle) }.unwrap();
+    /// Adds a cookie into the HTTP response.
+    pub fn add_cookie(self, cookie: &Cookie) -> Self {
+        functions::response_add_cookie(&self.0, &cookie.0);
         self
     }
 
     /// Removes a cookie in the HTTP response.
-    pub fn remove_cookie(self, cookie: Cookie) -> Self {
-        let handle = cookie.0;
-        std::mem::forget(cookie);
-        unsafe { imports::response_cookie_remove((self.0).0, handle) }.unwrap();
+    pub fn remove_cookie(self, cookie: &Cookie) -> Self {
+        functions::response_remove_cookie(&self.0, &cookie.0);
         self
     }
 
@@ -138,14 +87,14 @@ impl ResponseBuilder {
     ///
     /// This completes the builder and returns the response.
     pub fn body<T: AsRef<[u8]>>(self, body: T) -> Response {
-        unsafe { imports::response_body_set((self.0).0, body.as_ref()) }.unwrap();
-        self.0
+        functions::response_set_body(&self.0, body.as_ref());
+        Response(self.0)
     }
 }
 
 /// Represents a HTTP response.
 #[derive(Debug)]
-pub struct Response(u32);
+pub struct Response(functions::Response);
 
 impl Response {
     /// Creates a new HTTP response builder.
@@ -155,52 +104,22 @@ impl Response {
 
     /// Gets the status code of the HTTP response.
     pub fn status(&self) -> StatusCode {
-        unsafe { StatusCode::from_u16(imports::response_status_get(self.0).unwrap()).unwrap() }
+        StatusCode::from_u16(functions::response_status(&self.0)).unwrap()
     }
 
     /// Gets a header of the HTTP response.
     pub fn header<T: AsRef<str>>(&self, name: T) -> Option<String> {
-        unsafe {
-            let len = imports::response_header_length(self.0, name.as_ref()).unwrap();
-            if len == 0 {
-                return None;
-            }
-            let mut buf = Vec::with_capacity(len);
-            imports::response_header_get(self.0, name.as_ref(), buf.as_mut_ptr(), len).unwrap();
-            buf.set_len(len);
-            Some(String::from_utf8_unchecked(buf))
-        }
+        functions::response_header(&self.0, name.as_ref())
     }
 
     /// Gets the body of the HTTP response.
     pub fn body(&self) -> Vec<u8> {
-        unsafe {
-            let len = imports::response_body_length(self.0).unwrap();
-            let mut buf = Vec::with_capacity(len);
-            imports::response_body_get(self.0, buf.as_mut_ptr(), len).unwrap();
-            buf.set_len(len);
-            buf
-        }
-    }
-
-    #[doc(hidden)]
-    pub unsafe fn from_raw(handle: u32) -> Self {
-        Self(handle)
+        functions::response_body(&self.0)
     }
 
     #[doc(hidden)]
     pub unsafe fn into_raw(self) -> u32 {
-        let handle = self.0;
-        std::mem::forget(self);
-        handle
-    }
-}
-
-impl Drop for Response {
-    fn drop(&mut self) {
-        unsafe {
-            imports::response_free(self.0).unwrap();
-        }
+        self.0.into_raw() as u32
     }
 }
 
@@ -240,81 +159,70 @@ pub enum SameSite {
 }
 
 /// Used for building HTTP response cookies.
-pub struct CookieBuilder(Cookie);
+pub struct CookieBuilder(functions::Cookie);
 
 impl CookieBuilder {
     /// Creates a new HTTP response cookie builder.
-    pub fn new(name: &str, value: &str) -> Self {
-        unsafe { Self(imports::cookie_new(name, value).map(Cookie).unwrap()) }
+    pub fn new<T: AsRef<str>, U: AsRef<str>>(name: T, value: U) -> Self {
+        Self(functions::cookie_new(name.as_ref(), value.as_ref()))
     }
 
     /// Sets the HttpOnly attribute on the cookie.
     pub fn http_only(self) -> Self {
-        unsafe { imports::cookie_http_only_set((self.0).0) }.unwrap();
+        functions::cookie_set_http_only(&self.0, true);
         self
     }
 
     /// Sets the Secure attribute on the cookie.
     pub fn secure(self) -> Self {
-        unsafe { imports::cookie_secure_set((self.0).0) }.unwrap();
+        functions::cookie_set_secure(&self.0, true);
         self
     }
 
     /// Sets the MaxAge attribute on the cookie.
     pub fn max_age(self, value: Duration) -> Self {
-        unsafe { imports::cookie_max_age_set((self.0).0, value.whole_seconds()) }.unwrap();
+        functions::cookie_set_max_age(&self.0, value.whole_seconds());
         self
     }
 
     /// Sets the SameSite attribute on the cookie.
     pub fn same_site(self, value: SameSite) -> Self {
-        unsafe {
-            imports::cookie_same_site_set(
-                (self.0).0,
-                match value {
-                    SameSite::Strict => imports::SAME_SITE_POLICY_STRICT,
-                    SameSite::Lax => imports::SAME_SITE_POLICY_LAX,
-                    SameSite::None => imports::SAME_SITE_POLICY_NONE,
-                },
-            )
-        }
-        .unwrap();
+        functions::cookie_set_same_site(
+            &self.0,
+            match value {
+                SameSite::Strict => functions::SameSitePolicy::Strict,
+                SameSite::Lax => functions::SameSitePolicy::Lax,
+                SameSite::None => functions::SameSitePolicy::None,
+            },
+        );
         self
     }
 
     /// Sets the Domain attribute on the cookie.
-    pub fn domain(self, value: &str) -> Self {
-        unsafe { imports::cookie_domain_set((self.0).0, value) }.unwrap();
+    pub fn domain<T: AsRef<str>>(self, value: T) -> Self {
+        functions::cookie_set_domain(&self.0, value.as_ref());
         self
     }
 
     /// Sets the Path attribute on the cookie.
-    pub fn path(self, value: &str) -> Self {
-        unsafe { imports::cookie_path_set((self.0).0, value) }.unwrap();
+    pub fn path<T: AsRef<str>>(self, value: T) -> Self {
+        functions::cookie_set_path(&self.0, value.as_ref());
         self
     }
 
     /// Finishes building the cookie.
     pub fn finish(self) -> Cookie {
-        self.0
+        Cookie(self.0)
     }
 }
 
 /// Represents a HTTP response cookie.
-pub struct Cookie(u32);
+pub struct Cookie(functions::Cookie);
 
 impl Cookie {
     /// Builds a new HTTP response cookie with the given name and value.
     pub fn build<T: AsRef<str>, U: AsRef<str>>(name: T, value: U) -> CookieBuilder {
         CookieBuilder::new(name.as_ref(), value.as_ref())
-    }
-}
-
-impl Drop for Cookie {
-    fn drop(&mut self) {
-        unsafe {
-            imports::cookie_free(self.0).unwrap();
-        }
     }
 }
 

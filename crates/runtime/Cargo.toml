@@ -5,19 +5,18 @@ authors = ["Peter Huene <peter@huene.dev>"]
 edition = "2018"
 
 [dependencies]
+witx-bindgen-wasmtime = { git = "https://github.com/bytecodealliance/witx-bindgen", rev = "a623bd833c46661340d056cec8a0929325dfa2f2", features = ["async"] }
 wasmtime-functions-metadata = { path = "../metadata" }
-wiggle = "0.26.0"
-wasmtime-wiggle = "0.26.0"
 tide = { version = "0.16.0", default_features = false, features = ["h1-server", "cookies", "sessions"] }
-http-types = "2.10.0"
-time = "0.2.26"
-anyhow = "1.0.40"
+http-types = "2.11.1"
+time = "0.2.27"
+anyhow = "1.0.42"
 bytes = "1.0.1"
 async-std = "1.9.0"
 async-h1 = "2.3.2"
-async-trait = "0.1.48"
+async-trait = "0.1.50"
 log = "0.4.14"
-wasmtime = "0.26.0"
-wasmtime-wasi = "0.26.0"
+wasmtime = "0.28.0"
+wasmtime-wasi = "0.28.0"
 futures-timer = "3.0.2"
-futures = "0.3.13"
+futures = "0.3.15"

@@ -1,255 +1,37 @@
-(typename $size (@witx usize))
+enum same_site_policy {
+    strict,
+    lax,
+    none
+}
 
-(typename $charptr (@witx pointer (@witx char8)))
+type http_status = u16
 
-(typename $byteptr (@witx pointer u8))
+resource request {
+    method: function() -> string
+    uri: function() -> string
+    header: function(name: string) -> option<string>
+    cookie: function(name: string) -> option<string>
+    param: function(name: string) -> option<string>
+    body: function() -> list<u8>
+}
 
-(typename $status_code u16)
+resource response {
+    static new: function(status: http_status) -> expected<response, string>
+    status: function() -> http_status
+    header: function(name: string) -> option<string>
+    set_header: function(name: string, value: string)
+    add_cookie: function(cookie: cookie)
+    remove_cookie: function(cookie: cookie)
+    body: function() -> list<u8>
+    set_body: function(body: list<u8>)
+}
 
-(typename $response_handle (handle))
-
-(typename $cookie_handle (handle))
-
-(typename $same_site_policy
-  (enum (@witx tag u32)
-    ;;; Strict policy
-    $strict
-    ;;; Lax policy
-    $lax
-    ;;; No policy
-    $none
-  )
-)
-
-(typename $error
-  (enum (@witx tag u32)
-    ;;; Success
-    $ok
-    ;;; The module does not export a memory.
-    $missing_memory
-    ;;; Invalid argument
-    $invalid_argument
-    ;;; Invalid UTF-8
-    $invalid_utf8
-    ;;; Invalid pointer
-    $invalid_pointer
-    ;;; Invalid buffer length
-    $invalid_length
-    ;;; Invalid handle
-    $invalid_handle
-    ;;; Integer overflow
-    $integer_overflow
-    ;;; Handle space exhausted
-    $handles_exhausted
-  )
-)
-
-(module $functions
-  ;;; Gets the length of the request HTTP method.
-  (@interface func (export "request_method_length")
-    (result $r (expected $size (error $error)))
-  )
-
-  ;;; Gets the request HTTP method.
-  (@interface func (export "request_method_get")
-    (param $buffer $charptr)
-    (param $buffer_len $size)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Gets the length of the request URI.
-  (@interface func (export "request_uri_length")
-    (result $r (expected $size (error $error)))
-  )
-
-  ;;; Gets the request URI.
-  (@interface func (export "request_uri_get")
-    (param $buffer $charptr)
-    (param $buffer_len $size)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Gets the length of a request header.
-  (@interface func (export "request_header_length")
-    (param $name string)
-    (result $r (expected $size (error $error)))
-  )
-
-  ;;; Gets a request header.
-  (@interface func (export "request_header_get")
-    (param $name string)
-    (param $buffer $charptr)
-    (param $buffer_len $size)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Gets the length of a request cookie.
-  (@interface func (export "request_cookie_length")
-    (param $name string)
-    (result $r (expected $size (error $error)))
-  )
-
-  ;;; Gets a request cookie.
-  (@interface func (export "request_cookie_get")
-    (param $name string)
-    (param $buffer $charptr)
-    (param $buffer_len $size)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Gets the length of a request parameter.
-  (@interface func (export "request_param_length")
-    (param $name string)
-    (result $r (expected $size (error $error)))
-  )
-
-  ;;; Gets a request parameter.
-  (@interface func (export "request_param_get")
-    (param $name string)
-    (param $buffer $charptr)
-    (param $buffer_len $size)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Gets the length of the request body.
-  (@interface func (export "request_body_length")
-    (result $r (expected $size (error $error)))
-  )
-
-  ;;; Gets the request body.
-  (@interface func (export "request_body_get")
-    (param $buffer $byteptr)
-    (param $buffer_len $size)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Creates a new HTTP response.
-  (@interface func (export "response_new")
-    (param $status $status_code)
-    (result $r (expected $response_handle (error $error)))
-  )
-
-  ;;; Frees the response.
-  (@interface func (export "response_free")
-    (param $response $response_handle)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Gets the response status code.
-  (@interface func (export "response_status_get")
-    (param $response $response_handle)
-    (result $r (expected $status_code (error $error)))
-  )
-
-  ;;; Gets the length of a response header.
-  (@interface func (export "response_header_length")
-    (param $response $response_handle)
-    (param $name string)
-    (result $r (expected $size (error $error)))
-  )
-
-  ;;; Gets a response header.
-  (@interface func (export "response_header_get")
-    (param $response $response_handle)
-    (param $name string)
-    (param $buffer $charptr)
-    (param $buffer_len $size)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Sets a response header.
-  (@interface func (export "response_header_set")
-    (param $response $response_handle)
-    (param $name string)
-    (param $value string)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Inserts a response cookie.
-  (@interface func (export "response_cookie_insert")
-    (param $response $response_handle)
-    (param $cookie $cookie_handle)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Removes a response cookie.
-  (@interface func (export "response_cookie_remove")
-    (param $response $response_handle)
-    (param $cookie $cookie_handle)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Gets the length of the response body.
-  (@interface func (export "response_body_length")
-    (param $response $response_handle)
-    (result $r (expected $size (error $error)))
-  )
-
-  ;;; Gets the response body.
-  (@interface func (export "response_body_get")
-    (param $response $response_handle)
-    (param $buffer $byteptr)
-    (param $buffer_len $size)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Sets the response body.
-  (@interface func (export "response_body_set")
-    (param $response $response_handle)
-    (param $body (list u8))
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Creates a new response cookie.
-  (@interface func (export "cookie_new")
-    (param $name string)
-    (param $value string)
-    (result $r (expected $cookie_handle (error $error)))
-  )
-
-  ;;; Frees the response cookie.
-  (@interface func (export "cookie_free")
-    (param $cookie $cookie_handle)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Sets the HttpOnly attribute on the cookie.
-  (@interface func (export "cookie_http_only_set")
-    (param $cookie $cookie_handle)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Sets the Secure attribute on the cookie.
-  (@interface func (export "cookie_secure_set")
-    (param $cookie $cookie_handle)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Sets the MaxAge attribute on the cookie.
-  (@interface func (export "cookie_max_age_set")
-    (param $cookie $cookie_handle)
-    (param $max_age s64)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Sets the SameSite attribute on the cookie.
-  (@interface func (export "cookie_same_site_set")
-    (param $cookie $cookie_handle)
-    (param $same_site $same_site_policy)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Sets the Domain attribute on the cookie.
-  (@interface func (export "cookie_domain_set")
-    (param $cookie $cookie_handle)
-    (param $domain string)
-    (result $r (expected (error $error)))
-  )
-
-  ;;; Sets the Path attribute on the cookie.
-  (@interface func (export "cookie_path_set")
-    (param $cookie $cookie_handle)
-    (param $path string)
-    (result $r (expected (error $error)))
-  )
-)
+resource cookie {
+    static new: function(name: string, value: string) -> cookie
+    set_http_only: function(enabled: bool)
+    set_secure: function(enabled: bool)
+    set_max_age: function(age: s64)
+    set_same_site: function(policy: same_site_policy)
+    set_domain: function(domain: string)
+    set_path: function(path: string)
+}

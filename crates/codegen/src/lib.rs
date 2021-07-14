@@ -220,12 +220,12 @@ fn emit_http_function(mut func: ItemFn, path: LitStr, methods: Vec<Method>) -> R
 
     Ok(quote!(
         #[no_mangle]
-        pub extern "C" fn #ident() -> u32 {
+        pub extern "C" fn #ident(req: u32) -> u32 {
             #func
 
             unsafe {
                 wasmtime_functions::Response::from(
-                    #inner(wasmtime_functions::Request)
+                    #inner(wasmtime_functions::Request::from_raw(req))
                 )
                 .into_raw()
             }
