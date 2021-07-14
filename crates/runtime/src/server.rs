@@ -1,18 +1,13 @@
-use crate::host::{Functions, HostContext};
+use crate::host::Context;
 use anyhow::{anyhow, bail, Context as _, Result};
 use async_trait::async_trait;
-use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::fmt;
-use std::future::Future;
 use std::net::SocketAddr;
-use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use wasmtime::{Config, Engine, Instance, Linker, Module, Store};
 use wasmtime_functions_metadata::{FunctionTrigger, Metadata};
-use wasmtime_wasi::{sync::WasiCtxBuilder, Wasi};
+use wasmtime_wasi::sync::WasiCtxBuilder;
 
 const FUNCTION_TIMEOUT_SECS: u64 = 60;
 
@@ -31,6 +26,7 @@ pub struct State {
 
 struct StateInner {
     module: Module,
+    linker: Linker<Context>,
     env: Vec<(String, String)>,
     inherit_stdout: bool,
 }
@@ -40,14 +36,7 @@ impl StateInner {
         &self,
         request: Request,
         body: Vec<u8>,
-    ) -> Result<(Rc<RefCell<HostContext>>, Instance)> {
-        let store = Store::new(&self.module.engine());
-
-        // Yield to the host every 10000-or-so Wasm instructions
-        store.out_of_fuel_async_yield(u32::MAX, 10000);
-
-        let ctx = Rc::new(RefCell::new(HostContext::new(request, body)));
-
+    ) -> Result<(Store<Context>, Instance)> {
         let mut wasi_ctx = WasiCtxBuilder::new();
 
         if self.inherit_stdout {
@@ -56,41 +45,18 @@ impl StateInner {
 
         wasi_ctx = wasi_ctx.envs(&self.env)?;
 
-        assert!(Wasi::set_context(&store, wasi_ctx.build()?).is_ok());
-        assert!(store.set(ctx.clone()).is_ok());
+        let mut store = Store::new(
+            &self.module.engine(),
+            Context::new(request, body, wasi_ctx.build()),
+        );
+        store.out_of_fuel_async_yield(u64::MAX, 10000);
 
-        let linker = Linker::new(&store);
-        let instance = linker.instantiate_async(&self.module).await?;
+        let instance = self
+            .linker
+            .instantiate_async(&mut store, &self.module)
+            .await?;
 
-        // Call the start function to initialize any environment variables
-        if let Ok(f) = instance.get_typed_func::<(), ()>("_start") {
-            f.call_async(()).await?;
-        }
-
-        Ok((ctx, instance))
-    }
-}
-
-struct UnsafeSend<T>(T);
-
-// Note the `where` clause which specifically ensures that the output of the
-// future to be `Send` is required. We specifically don't require `T` to be
-// `Send` since that's the whole point of this function, but we require that
-// everything used to construct `T` is `Send` below.
-unsafe impl<T> Send for UnsafeSend<T>
-where
-    T: Future,
-    T::Output: Send,
-{
-}
-
-impl<T: Future> Future for UnsafeSend<T> {
-    type Output = T::Output;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<T::Output> {
-        // Note that this `unsafe` is unrelated to `Send`, it only has to do
-        // with "pin projection" and should be safe since it's all we do
-        // with the `Pin`.
-        unsafe { self.map_unchecked_mut(|p| &mut p.0).poll(cx) }
+        Ok((store, instance))
     }
 }
 
@@ -100,35 +66,26 @@ struct Endpoint {
 }
 
 impl Endpoint {
-    fn invoke_function(&self, req: tide::Request<State>) -> impl Future<Output = tide::Result> {
-        // Safety: as all of the Wasmtime objects (Store, Instance, TypedFunc, etc) are owned
-        // by this future and not shared with any other thread, this is safe except for
-        // any use of thread-local storage. Care must be used here to avoid any libraries that
-        // might not except the thread running the future to change between polls.
-        UnsafeSend(Self::_invoke_function(self.function.clone(), req))
-    }
-
-    async fn _invoke_function(
-        function: Arc<String>,
-        mut req: tide::Request<State>,
-    ) -> tide::Result {
+    async fn invoke_function(&self, mut req: tide::Request<State>) -> tide::Result {
         // TODO: move this into an async host function
         let body = req.body_bytes().await.map_err(|e| anyhow::anyhow!(e))?;
         let state = req.state().inner.clone();
-        let (host_ctx, instance) = state.instantiate(req, body).await?;
+        let (mut store, instance) = state.instantiate(req, body).await?;
 
-        let f = instance.get_typed_func::<(), i32>(&function)?;
+        let entry = instance.get_typed_func::<u32, u32, _>(&mut store, &self.function)?;
 
-        log::info!("Invoking function '{}'.", function);
+        let req = store.data().request_handle();
 
-        let res = f
-            .call_async(())
+        log::info!("Invoking function '{}'.", self.function);
+
+        let res = entry
+            .call_async(&mut store, req)
             .await
-            .with_context(|| format!("call to function '{}' trapped", function))?;
+            .with_context(|| format!("call to function '{}' trapped", self.function))?;
 
-        let ctx = host_ctx.borrow();
-
-        ctx.take_response(res.into())
+        store
+            .data()
+            .take_response(res)
             .ok_or_else(|| tide::Error::from(anyhow!("function did not return a HTTP response")))
     }
 }
@@ -177,15 +134,16 @@ impl Server {
         config.consume_fuel(true);
         config.async_support(true);
 
-        Wasi::add_to_config(&mut config);
-        Functions::add_to_config(&mut config);
-
         let engine = Engine::new(&config)?;
         let module = Module::new(&engine, module)?;
+
+        let mut linker = Linker::new(&engine);
+        Context::add_to_linker(&mut linker)?;
 
         let mut app = tide::with_state(State {
             inner: Arc::new(StateInner {
                 module,
+                linker,
                 env,
                 inherit_stdout,
             }),
