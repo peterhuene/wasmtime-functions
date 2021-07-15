@@ -1,6 +1,6 @@
 # Hello example
 
-This is a [simple serverless application](src/main.rs) that exposes a single HTTP function that responds with a greeting message.
+This is a [simple serverless application](src/lib.rs) that exposes a single HTTP function that responds with a greeting message.
 
 ## Install `cargo wasi`
 
