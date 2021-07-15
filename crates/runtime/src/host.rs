@@ -2,13 +2,12 @@ use anyhow::Result;
 use http_types::cookies::SameSite;
 use std::cell::RefCell;
 use std::convert::TryFrom;
-use std::fmt;
 use wasmtime::Linker;
 use wasmtime_wasi::WasiCtx;
 
 witx_bindgen_wasmtime::import!({
     paths: ["crates/runtime/witx/functions.witx"],
-    async: []
+    async: ["request::body"]
 });
 
 type Tables = functions::FunctionsTables<Host>;
@@ -21,12 +20,14 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(req: crate::server::Request, body: Vec<u8>, wasi: WasiCtx) -> Self {
+    pub fn new(req: crate::server::Request, wasi: WasiCtx) -> Self {
         let mut tables = Tables::default();
-        let request_handle = tables.request_table.insert(Request { inner: req, body });
+
+        // Insert a placeholder request resource
+        let request_handle = tables.request_table.insert(Request);
 
         Self {
-            host: Host {},
+            host: Host(req),
             request_handle,
             tables,
             wasi,
@@ -53,18 +54,8 @@ impl Context {
     }
 }
 
-struct Host;
-
-pub struct Request {
-    inner: crate::server::Request,
-    body: Vec<u8>,
-}
-
-impl fmt::Debug for Request {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Request")
-    }
-}
+#[derive(Debug)]
+pub struct Request;
 
 #[derive(Debug)]
 pub struct Response {
@@ -87,33 +78,36 @@ pub struct Cookie {
 // TODO: remove this in the future
 unsafe impl Sync for Cookie {}
 
+struct Host(crate::server::Request);
+
+#[witx_bindgen_wasmtime::async_trait]
 impl functions::Functions for Host {
     type Cookie = Cookie;
     type Request = Request;
     type Response = Response;
 
-    fn request_method(&mut self, request: &Self::Request) -> String {
-        request.inner.method().to_string()
+    fn request_method(&mut self, _: &Self::Request) -> String {
+        self.0.method().to_string()
     }
 
-    fn request_uri(&mut self, request: &Self::Request) -> String {
-        request.inner.url().as_str().to_string()
+    fn request_uri(&mut self, _: &Self::Request) -> String {
+        self.0.url().as_str().to_string()
     }
 
-    fn request_header(&mut self, request: &Self::Request, name: &str) -> Option<String> {
-        request.inner.header(name).map(|v| v.as_str().to_string())
+    fn request_header(&mut self, _: &Self::Request, name: &str) -> Option<String> {
+        self.0.header(name).map(|v| v.as_str().to_string())
     }
 
-    fn request_cookie(&mut self, request: &Self::Request, name: &str) -> Option<String> {
-        request.inner.cookie(name).map(|c| c.value().to_string())
+    fn request_cookie(&mut self, _: &Self::Request, name: &str) -> Option<String> {
+        self.0.cookie(name).map(|c| c.value().to_string())
     }
 
-    fn request_param(&mut self, request: &Self::Request, name: &str) -> Option<String> {
-        request.inner.param(name).map(ToString::to_string).ok()
+    fn request_param(&mut self, _: &Self::Request, name: &str) -> Option<String> {
+        self.0.param(name).map(ToString::to_string).ok()
     }
 
-    fn request_body(&mut self, request: &Self::Request) -> Vec<u8> {
-        request.body.clone()
+    async fn request_body(&mut self, _: &Self::Request) -> Result<Vec<u8>, String> {
+        self.0.body_bytes().await.map_err(|e| e.to_string())
     }
 
     fn response_new(&mut self, status: functions::HttpStatus) -> Result<Self::Response, String> {

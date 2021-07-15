@@ -51,7 +51,7 @@ impl Request {
     }
 
     /// Gets the body of the HTTP request.
-    pub fn body(&self) -> Vec<u8> {
+    pub fn body(&self) -> Result<Vec<u8>, String> {
         functions::request_body(&self.0)
     }
 }
