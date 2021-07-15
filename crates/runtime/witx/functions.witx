@@ -12,7 +12,7 @@ resource request {
     header: function(name: string) -> option<string>
     cookie: function(name: string) -> option<string>
     param: function(name: string) -> option<string>
-    body: function() -> list<u8>
+    body: function() -> expected<list<u8>, string>
 }
 
 resource response {

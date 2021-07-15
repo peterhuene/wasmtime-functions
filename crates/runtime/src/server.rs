@@ -32,11 +32,7 @@ struct StateInner {
 }
 
 impl StateInner {
-    pub async fn instantiate(
-        &self,
-        request: Request,
-        body: Vec<u8>,
-    ) -> Result<(Store<Context>, Instance)> {
+    pub async fn instantiate(&self, request: Request) -> Result<(Store<Context>, Instance)> {
         let mut wasi_ctx = WasiCtxBuilder::new();
 
         if self.inherit_stdout {
@@ -47,7 +43,7 @@ impl StateInner {
 
         let mut store = Store::new(
             &self.module.engine(),
-            Context::new(request, body, wasi_ctx.build()),
+            Context::new(request, wasi_ctx.build()),
         );
         store.out_of_fuel_async_yield(u64::MAX, 10000);
 
@@ -66,11 +62,9 @@ struct Endpoint {
 }
 
 impl Endpoint {
-    async fn invoke_function(&self, mut req: tide::Request<State>) -> tide::Result {
-        // TODO: move this into an async host function
-        let body = req.body_bytes().await.map_err(|e| anyhow::anyhow!(e))?;
+    async fn invoke_function(&self, req: tide::Request<State>) -> tide::Result {
         let state = req.state().inner.clone();
-        let (mut store, instance) = state.instantiate(req, body).await?;
+        let (mut store, instance) = state.instantiate(req).await?;
 
         let entry = instance.get_typed_func::<u32, u32, _>(&mut store, &self.function)?;
 
