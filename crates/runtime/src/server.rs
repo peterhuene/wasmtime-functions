@@ -42,7 +42,7 @@ impl StateInner {
         wasi_ctx = wasi_ctx.envs(&self.env)?;
 
         let mut store = Store::new(
-            &self.module.engine(),
+            self.module.engine(),
             Context::new(request, wasi_ctx.build()),
         );
         store.out_of_fuel_async_yield(u64::MAX, 10000);

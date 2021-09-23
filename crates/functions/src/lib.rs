@@ -4,7 +4,7 @@
 
 #![deny(missing_docs)]
 
-witx_bindgen_rust::import!("crates/runtime/witx/functions.witx");
+witx_bindgen_rust::import!("../../crates/runtime/witx/functions.witx");
 
 use http::Uri;
 use std::fmt;
@@ -25,34 +25,32 @@ impl Request {
 
     /// Gets the URI of the HTTP request.
     pub fn uri(&self) -> Uri {
-        functions::request_uri(&self.0)
-            .parse()
-            .expect("URI is invalid")
+        self.0.uri().parse().expect("URI is invalid")
     }
 
     /// Gets the method of the HTTP request.
     pub fn method(&self) -> String {
-        functions::request_method(&self.0)
+        self.0.method()
     }
 
     /// Gets a header of the HTTP request.
     pub fn header<T: AsRef<str>>(&self, name: T) -> Option<String> {
-        functions::request_header(&self.0, name.as_ref())
+        self.0.header(name.as_ref())
     }
 
     /// Gets a cookie of the HTTP request.
     pub fn cookie<T: AsRef<str>>(&self, name: T) -> Option<String> {
-        functions::request_cookie(&self.0, name.as_ref())
+        self.0.cookie(name.as_ref())
     }
 
     /// Gets a parameter of the HTTP request.
     pub fn param<T: AsRef<str>>(&self, name: T) -> Option<String> {
-        functions::request_param(&self.0, name.as_ref())
+        self.0.param(name.as_ref())
     }
 
     /// Gets the body of the HTTP request.
     pub fn body(&self) -> Result<Vec<u8>, String> {
-        functions::request_body(&self.0)
+        self.0.body()
     }
 }
 
@@ -62,24 +60,24 @@ pub struct ResponseBuilder(functions::Response);
 impl ResponseBuilder {
     /// Creates a new HTTP response builder.
     pub fn new(status: StatusCode) -> Self {
-        Self(functions::response_new(status.as_u16()).expect("status code is invalid"))
+        Self(functions::Response::new(status.as_u16()).expect("status code is invalid"))
     }
 
     /// Sets a header of the HTTP response.
     pub fn header<T: AsRef<str>, U: AsRef<str>>(self, name: T, value: U) -> Self {
-        functions::response_set_header(&self.0, name.as_ref(), value.as_ref());
+        self.0.set_header(name.as_ref(), value.as_ref());
         self
     }
 
     /// Adds a cookie into the HTTP response.
     pub fn add_cookie(self, cookie: &Cookie) -> Self {
-        functions::response_add_cookie(&self.0, &cookie.0);
+        self.0.add_cookie(&cookie.0);
         self
     }
 
     /// Removes a cookie in the HTTP response.
     pub fn remove_cookie(self, cookie: &Cookie) -> Self {
-        functions::response_remove_cookie(&self.0, &cookie.0);
+        self.0.remove_cookie(&cookie.0);
         self
     }
 
@@ -87,7 +85,7 @@ impl ResponseBuilder {
     ///
     /// This completes the builder and returns the response.
     pub fn body<T: AsRef<[u8]>>(self, body: T) -> Response {
-        functions::response_set_body(&self.0, body.as_ref());
+        self.0.set_body(body.as_ref());
         Response(self.0)
     }
 }
@@ -104,17 +102,17 @@ impl Response {
 
     /// Gets the status code of the HTTP response.
     pub fn status(&self) -> StatusCode {
-        StatusCode::from_u16(functions::response_status(&self.0)).unwrap()
+        StatusCode::from_u16(self.0.status()).unwrap()
     }
 
     /// Gets a header of the HTTP response.
     pub fn header<T: AsRef<str>>(&self, name: T) -> Option<String> {
-        functions::response_header(&self.0, name.as_ref())
+        self.0.header(name.as_ref())
     }
 
     /// Gets the body of the HTTP response.
     pub fn body(&self) -> Vec<u8> {
-        functions::response_body(&self.0)
+        self.0.body()
     }
 
     #[doc(hidden)]
@@ -164,49 +162,46 @@ pub struct CookieBuilder(functions::Cookie);
 impl CookieBuilder {
     /// Creates a new HTTP response cookie builder.
     pub fn new<T: AsRef<str>, U: AsRef<str>>(name: T, value: U) -> Self {
-        Self(functions::cookie_new(name.as_ref(), value.as_ref()))
+        Self(functions::Cookie::new(name.as_ref(), value.as_ref()))
     }
 
     /// Sets the HttpOnly attribute on the cookie.
     pub fn http_only(self) -> Self {
-        functions::cookie_set_http_only(&self.0, true);
+        self.0.set_http_only(true);
         self
     }
 
     /// Sets the Secure attribute on the cookie.
     pub fn secure(self) -> Self {
-        functions::cookie_set_secure(&self.0, true);
+        self.0.set_secure(true);
         self
     }
 
     /// Sets the MaxAge attribute on the cookie.
     pub fn max_age(self, value: Duration) -> Self {
-        functions::cookie_set_max_age(&self.0, value.whole_seconds());
+        self.0.set_max_age(value.whole_seconds());
         self
     }
 
     /// Sets the SameSite attribute on the cookie.
     pub fn same_site(self, value: SameSite) -> Self {
-        functions::cookie_set_same_site(
-            &self.0,
-            match value {
-                SameSite::Strict => functions::SameSitePolicy::Strict,
-                SameSite::Lax => functions::SameSitePolicy::Lax,
-                SameSite::None => functions::SameSitePolicy::None,
-            },
-        );
+        self.0.set_same_site(match value {
+            SameSite::Strict => functions::SameSitePolicy::Strict,
+            SameSite::Lax => functions::SameSitePolicy::Lax,
+            SameSite::None => functions::SameSitePolicy::None,
+        });
         self
     }
 
     /// Sets the Domain attribute on the cookie.
     pub fn domain<T: AsRef<str>>(self, value: T) -> Self {
-        functions::cookie_set_domain(&self.0, value.as_ref());
+        self.0.set_domain(value.as_ref());
         self
     }
 
     /// Sets the Path attribute on the cookie.
     pub fn path<T: AsRef<str>>(self, value: T) -> Self {
-        functions::cookie_set_path(&self.0, value.as_ref());
+        self.0.set_path(value.as_ref());
         self
     }
 

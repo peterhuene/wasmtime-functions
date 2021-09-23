@@ -5,7 +5,7 @@ authors = ["Peter Huene <peter@huene.dev>"]
 edition = "2018"
 
 [dependencies]
-witx-bindgen-rust = { git = "https://github.com/bytecodealliance/witx-bindgen", rev = "a623bd833c46661340d056cec8a0929325dfa2f2" }
+witx-bindgen-rust = { git = "https://github.com/bytecodealliance/witx-bindgen", rev = "aa00fa06ec7c90073e098a9a652ea8daa51ab1dc" }
 wasmtime-functions-codegen = { path = "../codegen" }
-http = "0.2.4"
-time = "0.2.27"
+http = "0.2.5"
+time = "0.3.2"
