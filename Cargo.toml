@@ -1,9 +1,4 @@
 [workspace]
 members = [
   "host",
-  "examples/hello",
 ]
-
-# TODO: remove this once 0.29.0 is released
-[patch.crates-io]
-wasmtime = { git = "https://github.com/bytecodealliance/wasmtime", rev = "13d317a0a8f9fb6a7432556ed1913087743e2b3e" }
